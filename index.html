@@ -140,6 +140,19 @@
             <!-- VIEW: DAILY GOALS -->
             <div id="daily-goals" class="tab-content active max-w-4xl mx-auto">
                 
+                <!-- Date Navigation -->
+                <div class="flex items-center justify-between mb-6 bg-dark-card border border-dark-border rounded-xl p-2 shadow-sm">
+                    <button onclick="changeDate(-1)" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors" title="Hari Sebelumnya">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <div onclick="resetDateToToday()" id="display-view-date" class="cursor-pointer text-sm md:text-base font-medium text-slate-200 text-center flex-1 hover:text-brand-400 transition-colors py-2" title="Klik untuk kembali ke Hari Ini">
+                        <!-- Date will be injected here -->
+                    </div>
+                    <button onclick="changeDate(1)" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors" title="Hari Berikutnya">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+
                 <!-- Input Area -->
                 <div class="bg-dark-card p-4 rounded-xl border border-dark-border shadow-sm mb-8">
                     <form id="task-form" class="flex gap-3">
@@ -174,7 +187,7 @@
                     <div class="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4">
                         <i class="fa-solid fa-mug-hot text-3xl text-slate-500"></i>
                     </div>
-                    <h4 class="text-slate-300 font-medium mb-1">Belum ada task hari ini</h4>
+                    <h4 class="text-slate-300 font-medium mb-1">Belum ada task di hari ini</h4>
                     <p class="text-slate-500 text-sm">Tambahkan task di atas untuk mulai produktif!</p>
                 </div>
             </div>
@@ -293,12 +306,9 @@
 
         // Tab Switcher
         function switchTab(tabId) {
-            // Sembunyikan semua tab
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            // Tampilkan tab yang dipilih
             document.getElementById(tabId).classList.add('active');
 
-            // Update styling tombol navigasi
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 btn.classList.remove('bg-brand-500', 'text-white');
                 btn.classList.add('text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
@@ -308,7 +318,6 @@
             activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
             activeBtn.classList.add('bg-brand-500', 'text-white');
 
-            // Update Header Texts
             if(tabId === 'daily-goals') {
                 document.getElementById('header-title').textContent = 'Goals Hari Ini';
                 document.getElementById('header-subtitle').textContent = 'Apa fokus utamamu hari ini?';
@@ -320,8 +329,46 @@
 
         // Fungsi dipanggil setelah berhasil login
         function initAppData() {
-            fetchTasks();
+            resetDateToToday(); // Setel tanggal ke hari ini dan load task
             fetchRoadmap();
+        }
+
+        // --- 2.5 DATE NAVIGATION LOGIC ---
+        let currentViewDate = new Date();
+
+        function getDBDateString(dateObj) {
+            // Menghasilkan string YYYY-MM-DD sesuai dengan waktu lokal user
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function updateDateDisplay() {
+            const todayStr = getDBDateString(new Date());
+            const viewStr = getDBDateString(currentViewDate);
+            const displayEl = document.getElementById('display-view-date');
+            const formattedDate = currentViewDate.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            
+            if (todayStr === viewStr) {
+                displayEl.innerHTML = `<span class="text-brand-400 font-bold">Hari ini</span> &bull; <span class="text-slate-400 font-normal">${formattedDate}</span>`;
+                document.getElementById('header-title').textContent = 'Goals Hari Ini';
+            } else {
+                displayEl.innerHTML = formattedDate;
+                document.getElementById('header-title').textContent = 'Goals History';
+            }
+        }
+
+        function changeDate(offset) {
+            currentViewDate.setDate(currentViewDate.getDate() + offset);
+            updateDateDisplay();
+            fetchTasks(); // Ambil data task untuk tanggal yang baru dipilih
+        }
+
+        function resetDateToToday() {
+            currentViewDate = new Date();
+            updateDateDisplay();
+            fetchTasks();
         }
 
         // --- 3. DAILY GOALS LOGIC (SUPABASE) ---
@@ -330,9 +377,14 @@
 
         async function fetchTasks() {
             if (!currentUser) return;
+            
+            const targetDate = getDBDateString(currentViewDate);
+
+            // Filter data yang diambil sesuai tanggal yang aktif
             const { data, error } = await supabaseClient
                 .from('tasks')
                 .select('*')
+                .eq('task_date', targetDate) 
                 .order('created_at', { ascending: false });
                 
             if (error) {
@@ -382,7 +434,9 @@
         async function addTask(text) {
             if (!text.trim() || !currentUser) return;
             
-            const newTask = { user_id: currentUser.id, text: text.trim(), completed: false };
+            // Masukkan tanggal aktif sebagai task_date
+            const targetDate = getDBDateString(currentViewDate);
+            const newTask = { user_id: currentUser.id, text: text.trim(), completed: false, task_date: targetDate };
             
             // UI Update instan (Optimistic UI)
             const tempId = 'temp-' + Date.now();
@@ -518,7 +572,7 @@
             }
         ];
 
-        let roadmapData = JSON.parse(JSON.stringify(defaultRoadmapData)); // Clone untuk state UI
+        let roadmapData = JSON.parse(JSON.stringify(defaultRoadmapData)); 
         
         async function fetchRoadmap() {
             if(!currentUser) return;
@@ -531,10 +585,8 @@
                 return;
             }
 
-            // Reset status checked lokal
             roadmapData = JSON.parse(JSON.stringify(defaultRoadmapData));
             
-            // Tandai topik yang sudah selesai di database
             if (data) {
                 const doneTopics = data.map(d => d.topic_id);
                 roadmapData.forEach(cat => {
@@ -553,18 +605,15 @@
             const topic = roadmapData[catIndex].topics[topicIndex];
             const isCurrentlyDone = topic.done;
             
-            // Update UI langsung
             topic.done = !isCurrentlyDone;
             renderRoadmap();
 
             if (!isCurrentlyDone) {
-                // Jika diceklis, insert ke database
                 const { error } = await supabaseClient
                     .from('roadmap_progress')
                     .insert([{ user_id: currentUser.id, topic_id: topic.id }]);
                 if(error) { console.error(error); fetchRoadmap(); }
             } else {
-                // Jika di-uncheck, delete dari database
                 const { error } = await supabaseClient
                     .from('roadmap_progress')
                     .delete()
@@ -575,7 +624,6 @@
 
         async function resetRoadmap() {
             if(confirm("Apakah kamu yakin ingin mereset semua progress roadmap?")) {
-                // Hapus semua data progress roadmap milik user ini
                 const { error } = await supabaseClient
                     .from('roadmap_progress')
                     .delete()
@@ -612,8 +660,6 @@
             container.innerHTML = '';
 
             roadmapData.forEach((category, catIndex) => {
-                
-                // Hitung progress kategori ini
                 const catTotal = category.topics.length;
                 const catDone = category.topics.filter(t => t.done).length;
                 const isAllDone = catTotal === catDone && catTotal > 0;
@@ -670,7 +716,7 @@
         }
 
         // --- INIT ---
-        checkSession(); // Cek user aktif, jika belum login tampilkan form auth
+        checkSession(); 
 
     </script>
 </body>
