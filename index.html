@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevFocus - IT Productivity Hub</title>
+    <!-- Tailwind CSS untuk Styling yang cepat dan modern -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome untuk Ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tambahan Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            500: '#3b82f6', // blue-500
+                            600: '#2563eb', // blue-600
+                        },
+                        dark: {
+                            bg: '#0f172a',    // slate-900
+                            card: '#1e293b',  // slate-800
+                            border: '#334155' // slate-700
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        /* Animasi transisi antar tab */
+        .tab-content { display: none; animation: fadeIn 0.3s ease-in-out; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .task-done { text-decoration: line-through; color: #94a3b8; }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden selection:bg-brand-500 selection:text-white">
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="absolute inset-0 bg-dark-bg z-50 flex items-center justify-center p-4">
+        <div class="bg-dark-card border border-dark-border p-8 rounded-xl shadow-2xl max-w-md w-full">
+            <div class="flex justify-center mb-6">
+                <div class="w-12 h-12 rounded bg-brand-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-brand-500/30">
+                    <i class="fa-solid fa-code"></i>
+                </div>
+            </div>
+            <h2 class="text-2xl font-bold text-white text-center mb-2">Login ke DevFocus</h2>
+            <p class="text-slate-400 text-center text-sm mb-6">Gunakan email dan password untuk masuk</p>
+            
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Email</label>
+                    <input type="email" id="auth-email" required class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-brand-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Password</label>
+                    <input type="password" id="auth-password" required class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-brand-500 focus:outline-none">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" id="btn-login" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 rounded-lg font-medium transition-colors">Login</button>
+                    <button type="button" id="btn-register" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-medium transition-colors">Daftar</button>
+                </div>
+                <p id="auth-error" class="text-red-400 text-sm text-center hidden mt-2"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- APP CONTAINER (Disembunyikan saat belum login) -->
+    <div id="app-screen" class="flex h-full w-full hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col h-full shrink-0">
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-right hidden sm:block">
+                    <p class="text-sm font-medium text-slate-200">IT Professional</p>
+                    <p class="text-xs text-brand-500">Workspace</p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center border border-slate-600">
+                    <i class="fa-solid fa-user-astronaut text-slate-300"></i>
+                </div>
+                <button onclick="logout()" class="ml-2 text-slate-400 hover:text-red-400 transition-colors" title="Logout">
+                    <i class="fa-solid fa-right-from-bracket text-xl"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+            
+            <!-- VIEW: DAILY GOALS -->
+            <div id="daily-goals" class="tab-content active max-w-4xl mx-auto">
+                
+                <!-- Input Area -->
+                <div class="bg-dark-card p-4 rounded-xl border border-dark-border shadow-sm mb-8">
+                    <form id="task-form" class="flex gap-3">
+                        <div class="relative flex-1">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-terminal text-slate-500"></i>
+                            </div>
+                            <input type="text" id="task-input" autocomplete="off" placeholder="Tambahkan task (contoh: Fix bug API login, Review PR tim...)" 
+                                class="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all">
+                        </div>
+                        <button type="submit" class="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg shadow-lg shadow-brand-500/20 transition-all flex items-center gap-2 shrink-0">
+                            <i class="fa-solid fa-plus"></i> Tambah
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Task Stats -->
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-slate-200">Daftar Task</h3>
+                    <div class="text-sm px-3 py-1 bg-slate-800 rounded-full border border-slate-700 text-slate-300">
+                        Selesai: <span id="task-stats" class="text-brand-500 font-bold">0/0</span>
+                    </div>
+                </div>
+
+                <!-- Task List -->
+                <div id="task-list" class="space-y-3">
+                    <!-- Tasks will be injected here via JS -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="task-empty-state" class="hidden flex-col items-center justify-center py-16 text-center">
+                    <div class="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-mug-hot text-3xl text-slate-500"></i>
+                    </div>
+                    <h4 class="text-slate-300 font-medium mb-1">Belum ada task hari ini</h4>
+                    <p class="text-slate-500 text-sm">Tambahkan task di atas untuk mulai produktif!</p>
+                </div>
+            </div>
+
+            <!-- VIEW: FULLSTACK ROADMAP -->
+            <div id="roadmap" class="tab-content max-w-5xl mx-auto">
+                
+                <!-- Roadmap Progress -->
+                <div class="bg-dark-card p-6 rounded-xl border border-dark-border mb-8 flex items-center gap-6">
+                    <div class="flex-1">
+                        <div class="flex justify-between items-end mb-2">
+                            <div>
+                                <h3 class="text-lg font-bold text-white">Progress Belajar Fullstack</h3>
+                                <p class="text-sm text-slate-400 mt-1">Lacak pencapaianmu untuk menjadi Fullstack Developer handal.</p>
+                            </div>
+                            <span id="roadmap-percentage" class="text-2xl font-bold text-brand-500">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-900 rounded-full h-3 border border-slate-700 overflow-hidden">
+                            <div id="roadmap-progress-bar" class="bg-gradient-to-r from-brand-600 to-cyan-400 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <button onclick="resetRoadmap()" class="shrink-0 px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 hover:bg-slate-700 hover:text-white rounded border border-slate-600 transition-colors">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Reset
+                    </button>
+                </div>
+
+                <!-- Roadmap Categories -->
+                <div id="roadmap-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <!-- Roadmap content injected by JS -->
+                </div>
+
+            </div>
+        </div>
+    </main>
+    </div> <!-- Tutup app-screen -->
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- 0. SUPABASE CONFIG ---
+        // PENTING: MASUKKAN URL DAN KEY SUPABASE KAMU DI SINI
+        const SUPABASE_URL = 'https://sbgiagfpfviukcgscmxo.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNiZ2lhZ2ZwZnZpdWtjZ3NjbXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyODU0OTMsImV4cCI6MjA5Mjg2MTQ5M30.N4rPj92vo9KdTMcLaRj1sBxOJ8OYBClKPsVthIStoEg';
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let currentUser = null;
+
+        // --- 1. AUTHENTICATION LOGIC ---
+        const authScreen = document.getElementById('auth-screen');
+        const appScreen = document.getElementById('app-screen');
+        const authError = document.getElementById('auth-error');
+
+        async function checkSession() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            handleAuthChange(session);
+        }
+
+        function handleAuthChange(session) {
+            if (session) {
+                currentUser = session.user;
+                authScreen.classList.add('hidden');
+                appScreen.classList.remove('hidden');
+                initAppData();
+            } else {
+                currentUser = null;
+                authScreen.classList.remove('hidden');
+                appScreen.classList.add('hidden');
+            }
+        }
+
+        // Listener untuk perubahan auth
+        supabaseClient.auth.onAuthStateChange((_event, session) => {
+            handleAuthChange(session);
+        });
+
+        // Login
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            authError.classList.add('hidden');
+            
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                authError.textContent = error.message;
+                authError.classList.remove('hidden');
+            }
+        });
+
+        // Register
+        document.getElementById('btn-register').addEventListener('click', async () => {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            if(!email || !password) return alert("Isi email dan password dulu!");
+            
+            authError.classList.add('hidden');
+            const { error } = await supabaseClient.auth.signUp({ email, password });
+            
+            if (error) {
+                authError.textContent = error.message;
+                authError.classList.remove('hidden');
+            } else {
+                alert("Registrasi berhasil! Silakan cek email (jika konfirmasi email aktif) atau langsung login.");
+            }
+        });
+
+        // Logout
+        async function logout() {
+            await supabaseClient.auth.signOut();
+        }
+
+        // --- 2. SETUP & UTILS ---
+        
+        // Menampilkan tanggal hari ini di sidebar
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('current-date').textContent = new Date().toLocaleDateString('id-ID', dateOptions);
+
+        // Tab Switcher
+        function switchTab(tabId) {
+            // Sembunyikan semua tab
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            // Tampilkan tab yang dipilih
+            document.getElementById(tabId).classList.add('active');
+
+            // Update styling tombol navigasi
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-500', 'text-white');
+                btn.classList.add('text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
+            });
+
+            const activeBtn = document.getElementById(`btn-${tabId}`);
+            activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
+            activeBtn.classList.add('bg-brand-500', 'text-white');
+
+            // Update Header Texts
+            if(tabId === 'daily-goals') {
+                document.getElementById('header-title').textContent = 'Goals Hari Ini';
+                document.getElementById('header-subtitle').textContent = 'Apa fokus utamamu hari ini?';
+            } else {
+                document.getElementById('header-title').textContent = 'Fullstack Roadmap';
+                document.getElementById('header-subtitle').textContent = 'Perjalanan karir menuju Fullstack Developer';
+            }
+        }
+
+        // Fungsi dipanggil setelah berhasil login
+        function initAppData() {
+            fetchTasks();
+            fetchRoadmap();
+        }
+
+        // --- 3. DAILY GOALS LOGIC (SUPABASE) ---
+        
+        let tasks = [];
+
+        async function fetchTasks() {
+            if (!currentUser) return;
+            const { data, error } = await supabaseClient
+                .from('tasks')
+                .select('*')
+                .order('created_at', { ascending: false });
+                
+            if (error) {
+                console.error('Error fetching tasks:', error);
+                return;
+            }
+            tasks = data || [];
+            renderTasks();
+        }
+
+        function renderTasks() {
+            const listEl = document.getElementById('task-list');
+            const emptyState = document.getElementById('task-empty-state');
+            const stats = document.getElementById('task-stats');
+            
+            listEl.innerHTML = '';
+            
+            if (tasks.length === 0) {
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+            } else {
+                emptyState.classList.add('hidden');
+                emptyState.classList.remove('flex');
+                
+                tasks.forEach((task, index) => {
+                    const taskItem = document.createElement('div');
+                    taskItem.className = `flex items-center gap-3 p-4 rounded-lg border ${task.completed ? 'bg-slate-800/50 border-slate-700/50' : 'bg-dark-card border-dark-border'} transition-all group`;
+                    
+                    taskItem.innerHTML = `
+                        <button onclick="toggleTask('${task.id}', ${task.completed})" class="shrink-0 w-6 h-6 rounded border flex items-center justify-center transition-colors ${task.completed ? 'bg-brand-500 border-brand-500 text-white' : 'border-slate-500 text-transparent hover:border-brand-500'}">
+                            <i class="fa-solid fa-check text-xs"></i>
+                        </button>
+                        <span class="flex-1 text-sm ${task.completed ? 'task-done' : 'text-slate-200'}">${escapeHTML(task.text)}</span>
+                        <button onclick="deleteTask('${task.id}')" class="opacity-0 group-hover:opacity-100 p-2 text-slate-500 hover:text-red-400 transition-all rounded hover:bg-slate-700">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    `;
+                    listEl.appendChild(taskItem);
+                });
+            }
+
+            // Update stats
+            const completedCount = tasks.filter(t => t.completed).length;
+            stats.textContent = `${completedCount}/${tasks.length}`;
+        }
+
+        async function addTask(text) {
+            if (!text.trim() || !currentUser) return;
+            
+            const newTask = { user_id: currentUser.id, text: text.trim(), completed: false };
+            
+            // UI Update instan (Optimistic UI)
+            const tempId = 'temp-' + Date.now();
+            tasks.unshift({ id: tempId, ...newTask });
+            renderTasks();
+
+            const { data, error } = await supabaseClient
+                .from('tasks')
+                .insert([newTask])
+                .select()
+                .single();
+                
+            if (!error && data) {
+                // Ganti ID sementara dengan ID asli dari database
+                const idx = tasks.findIndex(t => t.id === tempId);
+                if(idx !== -1) tasks[idx] = data;
+                renderTasks();
+            } else {
+                console.error(error);
+                fetchTasks(); // Rollback jika error
+            }
+        }
+
+        async function toggleTask(id, currentStatus) {
+            // UI Update instan
+            const task = tasks.find(t => t.id === id);
+            if(task) task.completed = !currentStatus;
+            renderTasks();
+
+            const { error } = await supabaseClient
+                .from('tasks')
+                .update({ completed: !currentStatus })
+                .eq('id', id);
+                
+            if(error) {
+                console.error(error);
+                fetchTasks(); // Rollback jika error
+            }
+        }
+
+        async function deleteTask(id) {
+            // UI Update instan
+            tasks = tasks.filter(t => t.id !== id);
+            renderTasks();
+
+            const { error } = await supabaseClient
+                .from('tasks')
+                .delete()
+                .eq('id', id);
+                
+            if(error) {
+                console.error(error);
+                fetchTasks(); // Rollback jika error
+            }
+        }
+
+        // Form Submit Handler
+        document.getElementById('task-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('task-input');
+            addTask(input.value);
+            input.value = '';
+        });
+
+        // --- 4. FULLSTACK ROADMAP LOGIC (SUPABASE) ---
+
+        const defaultRoadmapData = [
+            {
+                category: "Internet & Dasar Web",
+                icon: "fa-globe",
+                color: "text-blue-400",
+                topics: [
+                    { id: "r1", title: "Cara kerja Internet (HTTP/DNS)", done: false },
+                    { id: "r2", title: "Browser & DOM", done: false },
+                    { id: "r3", title: "Hosting & Domain Dasar", done: false }
+                ]
+            },
+            {
+                category: "Frontend Fundamentals",
+                icon: "fa-html5",
+                color: "text-orange-500",
+                topics: [
+                    { id: "r4", title: "HTML5 Semantic", done: false },
+                    { id: "r5", title: "CSS3 (Flexbox & Grid)", done: false },
+                    { id: "r6", title: "Vanilla JavaScript (ES6+)", done: false },
+                    { id: "r7", title: "Fetch API / AJAX", done: false }
+                ]
+            },
+            {
+                category: "Frontend Frameworks",
+                icon: "fa-react",
+                color: "text-cyan-400",
+                topics: [
+                    { id: "r8", title: "React.js / Vue / Angular", done: false },
+                    { id: "r9", title: "State Management (Redux/Pinia)", done: false },
+                    { id: "r10", title: "CSS Framework (Tailwind/Bootstrap)", done: false },
+                    { id: "r11", title: "Next.js / Nuxt (SSR/SSG)", done: false }
+                ]
+            },
+            {
+                category: "Backend Fundamentals",
+                icon: "fa-server",
+                color: "text-green-500",
+                topics: [
+                    { id: "r12", title: "Pilih Bahasa (Node.js/Python/PHP)", done: false },
+                    { id: "r13", title: "RESTful API Development", done: false },
+                    { id: "r14", title: "Authentication (JWT, OAuth)", done: false },
+                    { id: "r15", title: "Framework (Express/Laravel/Django)", done: false }
+                ]
+            },
+            {
+                category: "Databases",
+                icon: "fa-database",
+                color: "text-yellow-500",
+                topics: [
+                    { id: "r16", title: "Relational DB (PostgreSQL/MySQL)", done: false },
+                    { id: "r17", title: "NoSQL DB (MongoDB)", done: false },
+                    { id: "r18", title: "ORM / ODM (Prisma/Mongoose)", done: false },
+                    { id: "r19", title: "Caching (Redis)", done: false }
+                ]
+            },
+            {
+                category: "DevOps & Deployment",
+                icon: "fa-docker",
+                color: "text-blue-500",
+                topics: [
+                    { id: "r20", title: "Git & GitHub / GitLab", done: false },
+                    { id: "r21", title: "Linux Command Line Dasar", done: false },
+                    { id: "r22", title: "Docker & Containerization", done: false },
+                    { id: "r23", title: "CI/CD Pipelines", done: false },
+                    { id: "r24", title: "Cloud Services (AWS/GCP/Vercel)", done: false }
+                ]
+            }
+        ];
+
+        let roadmapData = JSON.parse(JSON.stringify(defaultRoadmapData)); // Clone untuk state UI
+        
+        async function fetchRoadmap() {
+            if(!currentUser) return;
+            const { data, error } = await supabaseClient
+                .from('roadmap_progress')
+                .select('topic_id');
+                
+            if (error) {
+                console.error("Error fetching roadmap:", error);
+                return;
+            }
+
+            // Reset status checked lokal
+            roadmapData = JSON.parse(JSON.stringify(defaultRoadmapData));
+            
+            // Tandai topik yang sudah selesai di database
+            if (data) {
+                const doneTopics = data.map(d => d.topic_id);
+                roadmapData.forEach(cat => {
+                    cat.topics.forEach(topic => {
+                        if (doneTopics.includes(topic.id)) {
+                            topic.done = true;
+                        }
+                    });
+                });
+            }
+            renderRoadmap();
+        }
+
+        async function toggleRoadmapTopic(catIndex, topicIndex) {
+            if(!currentUser) return;
+            const topic = roadmapData[catIndex].topics[topicIndex];
+            const isCurrentlyDone = topic.done;
+            
+            // Update UI langsung
+            topic.done = !isCurrentlyDone;
+            renderRoadmap();
+
+            if (!isCurrentlyDone) {
+                // Jika diceklis, insert ke database
+                const { error } = await supabaseClient
+                    .from('roadmap_progress')
+                    .insert([{ user_id: currentUser.id, topic_id: topic.id }]);
+                if(error) { console.error(error); fetchRoadmap(); }
+            } else {
+                // Jika di-uncheck, delete dari database
+                const { error } = await supabaseClient
+                    .from('roadmap_progress')
+                    .delete()
+                    .match({ user_id: currentUser.id, topic_id: topic.id });
+                if(error) { console.error(error); fetchRoadmap(); }
+            }
+        }
+
+        async function resetRoadmap() {
+            if(confirm("Apakah kamu yakin ingin mereset semua progress roadmap?")) {
+                // Hapus semua data progress roadmap milik user ini
+                const { error } = await supabaseClient
+                    .from('roadmap_progress')
+                    .delete()
+                    .eq('user_id', currentUser.id);
+                    
+                if(!error) {
+                    roadmapData = JSON.parse(JSON.stringify(defaultRoadmapData));
+                    renderRoadmap();
+                } else {
+                    console.error("Gagal mereset:", error);
+                }
+            }
+        }
+
+        function updateRoadmapProgress() {
+            let totalTopics = 0;
+            let completedTopics = 0;
+
+            roadmapData.forEach(cat => {
+                cat.topics.forEach(topic => {
+                    totalTopics++;
+                    if (topic.done) completedTopics++;
+                });
+            });
+
+            const percentage = totalTopics === 0 ? 0 : Math.round((completedTopics / totalTopics) * 100);
+            
+            document.getElementById('roadmap-percentage').textContent = `${percentage}%`;
+            document.getElementById('roadmap-progress-bar').style.width = `${percentage}%`;
+        }
+
+        function renderRoadmap() {
+            const container = document.getElementById('roadmap-container');
+            container.innerHTML = '';
+
+            roadmapData.forEach((category, catIndex) => {
+                
+                // Hitung progress kategori ini
+                const catTotal = category.topics.length;
+                const catDone = category.topics.filter(t => t.done).length;
+                const isAllDone = catTotal === catDone && catTotal > 0;
+
+                let html = `
+                    <div class="bg-dark-card border ${isAllDone ? 'border-brand-500/50' : 'border-dark-border'} rounded-xl overflow-hidden flex flex-col transition-all">
+                        <div class="p-4 border-b border-dark-border bg-slate-800/30 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-brands ${category.icon} ${category.color} text-xl w-6 text-center"></i>
+                                <h4 class="font-semibold text-slate-200 text-sm">${category.category}</h4>
+                            </div>
+                            <span class="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-1 rounded">${catDone}/${catTotal}</span>
+                        </div>
+                        <div class="p-4 flex-1 space-y-3">
+                `;
+
+                category.topics.forEach((topic, topicIndex) => {
+                    html += `
+                        <label class="flex items-start gap-3 cursor-pointer group">
+                            <div class="relative flex items-start justify-center pt-0.5">
+                                <input type="checkbox" class="sr-only" ${topic.done ? 'checked' : ''} onchange="toggleRoadmapTopic(${catIndex}, ${topicIndex})">
+                                <div class="w-5 h-5 rounded border ${topic.done ? 'bg-brand-500 border-brand-500' : 'border-slate-600 bg-slate-900 group-hover:border-brand-400'} flex items-center justify-center transition-colors">
+                                    <i class="fa-solid fa-check text-[10px] text-white ${topic.done ? 'opacity-100' : 'opacity-0'}"></i>
+                                </div>
+                            </div>
+                            <span class="text-sm leading-tight pt-1 select-none transition-colors ${topic.done ? 'text-slate-500 line-through' : 'text-slate-300 group-hover:text-white'}">
+                                ${escapeHTML(topic.title)}
+                            </span>
+                        </label>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += html;
+            });
+
+            updateRoadmapProgress();
+        }
+
+        // --- UTILS ---
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+
+        // --- INIT ---
+        checkSession(); // Cek user aktif, jika belum login tampilkan form auth
+
+    </script>
+</body>
+</html>
