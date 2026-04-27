@@ -88,20 +88,51 @@
     <div id="app-screen" class="flex h-full w-full hidden">
         <!-- Sidebar -->
         <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col h-full shrink-0">
+            <div class="p-6 border-b border-dark-border flex items-center gap-3">
+                <div class="w-8 h-8 rounded bg-brand-500 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-brand-500/30">
+                    <i class="fa-solid fa-code"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight text-white">DevFocus</h1>
             </div>
-            <div class="flex items-center gap-4">
-                <div class="text-right hidden sm:block">
-                    <p class="text-sm font-medium text-slate-200">IT Professional</p>
-                    <p class="text-xs text-brand-500">Workspace</p>
-                </div>
-                <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center border border-slate-600">
-                    <i class="fa-solid fa-user-astronaut text-slate-300"></i>
-                </div>
-                <button onclick="logout()" class="ml-2 text-slate-400 hover:text-red-400 transition-colors" title="Logout">
-                    <i class="fa-solid fa-right-from-bracket text-xl"></i>
+
+            <nav class="flex-1 p-4 space-y-2">
+                <button onclick="switchTab('daily-goals')" id="btn-daily-goals" class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg bg-brand-500 text-white transition-colors duration-200">
+                    <i class="fa-solid fa-list-check w-5 text-center"></i>
+                    Goals Hari Ini
                 </button>
+                <button onclick="switchTab('roadmap')" id="btn-roadmap" class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors duration-200">
+                    <i class="fa-solid fa-map-location-dot w-5 text-center"></i>
+                    Fullstack Roadmap
+                </button>
+            </nav>
+
+            <div class="p-6 border-t border-dark-border text-xs text-slate-500 text-center">
+                <p>Tetap produktif, Engineer!</p>
+                <p class="mt-1" id="current-date"></p>
             </div>
-        </header>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-dark-bg relative">
+            <!-- Header -->
+            <header class="h-20 border-b border-dark-border px-8 flex items-center justify-between shrink-0 bg-dark-bg/80 backdrop-blur-sm z-10">
+                <div>
+                    <h2 id="header-title" class="text-2xl font-bold text-white">Goals Hari Ini</h2>
+                    <p id="header-subtitle" class="text-sm text-slate-400">Apa fokus utamamu hari ini?</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-sm font-medium text-slate-200">IT Professional</p>
+                        <p class="text-xs text-brand-500">Workspace</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center border border-slate-600">
+                        <i class="fa-solid fa-user-astronaut text-slate-300"></i>
+                    </div>
+                    <button onclick="logout()" class="ml-2 text-slate-400 hover:text-red-400 transition-colors" title="Logout">
+                        <i class="fa-solid fa-right-from-bracket text-xl"></i>
+                    </button>
+                </div>
+            </header>
 
         <!-- Scrollable Content Area -->
         <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
