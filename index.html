@@ -95,7 +95,7 @@
                 <h1 class="text-xl font-bold tracking-tight text-white">DevFocus</h1>
             </div>
 
-            <nav class="flex-1 p-4 space-y-2">
+            <nav class="p-4 space-y-2">
                 <button onclick="switchTab('daily-goals')" id="btn-daily-goals" class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg bg-brand-500 text-white transition-colors duration-200">
                     <i class="fa-solid fa-list-check w-5 text-center"></i>
                     Goals Hari Ini
@@ -106,7 +106,30 @@
                 </button>
             </nav>
 
-            <div class="p-6 border-t border-dark-border text-xs text-slate-500 text-center">
+            <!-- POMODORO TIMER WIDGET -->
+            <div class="px-4 mt-2 flex-1">
+                <div class="bg-slate-800/40 rounded-xl p-4 border border-slate-700 shadow-inner">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-semibold text-brand-400 uppercase tracking-wider" id="timer-label">Focus Timer</span>
+                        <button onclick="toggleTimerMode()" class="text-slate-500 hover:text-white transition-colors" title="Ganti ke Mode Istirahat">
+                            <i class="fa-solid fa-mug-hot text-xs" id="timer-icon"></i>
+                        </button>
+                    </div>
+                    <div class="text-4xl font-bold text-white text-center mb-4 tabular-nums tracking-tight font-mono" id="timer-display">
+                        25:00
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="toggleTimer()" id="btn-timer-play" class="flex-1 bg-brand-600/20 text-brand-400 hover:bg-brand-600 hover:text-white py-2 rounded-lg text-sm font-medium transition-colors border border-brand-500/30">
+                            <i class="fa-solid fa-play mr-1"></i> Start
+                        </button>
+                        <button onclick="resetTimer()" class="w-10 bg-slate-700/50 text-slate-400 hover:bg-slate-600 hover:text-white py-2 rounded-lg text-sm transition-colors border border-slate-600" title="Reset Waktu">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-dark-border text-xs text-slate-500 text-center shrink-0">
                 <p>Tetap produktif, Engineer!</p>
                 <p class="mt-1" id="current-date"></p>
             </div>
@@ -329,7 +352,7 @@
 
         // Fungsi dipanggil setelah berhasil login
         function initAppData() {
-            resetDateToToday(); // Setel tanggal ke hari ini dan load task
+            resetDateToToday(); 
             fetchRoadmap();
         }
 
@@ -337,7 +360,6 @@
         let currentViewDate = new Date();
 
         function getDBDateString(dateObj) {
-            // Menghasilkan string YYYY-MM-DD sesuai dengan waktu lokal user
             const year = dateObj.getFullYear();
             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
             const day = String(dateObj.getDate()).padStart(2, '0');
@@ -362,7 +384,7 @@
         function changeDate(offset) {
             currentViewDate.setDate(currentViewDate.getDate() + offset);
             updateDateDisplay();
-            fetchTasks(); // Ambil data task untuk tanggal yang baru dipilih
+            fetchTasks(); 
         }
 
         function resetDateToToday() {
@@ -380,7 +402,6 @@
             
             const targetDate = getDBDateString(currentViewDate);
 
-            // Filter data yang diambil sesuai tanggal yang aktif
             const { data, error } = await supabaseClient
                 .from('tasks')
                 .select('*')
@@ -426,7 +447,6 @@
                 });
             }
 
-            // Update stats
             const completedCount = tasks.filter(t => t.completed).length;
             stats.textContent = `${completedCount}/${tasks.length}`;
         }
@@ -434,11 +454,9 @@
         async function addTask(text) {
             if (!text.trim() || !currentUser) return;
             
-            // Masukkan tanggal aktif sebagai task_date
             const targetDate = getDBDateString(currentViewDate);
             const newTask = { user_id: currentUser.id, text: text.trim(), completed: false, task_date: targetDate };
             
-            // UI Update instan (Optimistic UI)
             const tempId = 'temp-' + Date.now();
             tasks.unshift({ id: tempId, ...newTask });
             renderTasks();
@@ -450,18 +468,16 @@
                 .single();
                 
             if (!error && data) {
-                // Ganti ID sementara dengan ID asli dari database
                 const idx = tasks.findIndex(t => t.id === tempId);
                 if(idx !== -1) tasks[idx] = data;
                 renderTasks();
             } else {
                 console.error(error);
-                fetchTasks(); // Rollback jika error
+                fetchTasks(); 
             }
         }
 
         async function toggleTask(id, currentStatus) {
-            // UI Update instan
             const task = tasks.find(t => t.id === id);
             if(task) task.completed = !currentStatus;
             renderTasks();
@@ -473,12 +489,11 @@
                 
             if(error) {
                 console.error(error);
-                fetchTasks(); // Rollback jika error
+                fetchTasks(); 
             }
         }
 
         async function deleteTask(id) {
-            // UI Update instan
             tasks = tasks.filter(t => t.id !== id);
             renderTasks();
 
@@ -489,11 +504,10 @@
                 
             if(error) {
                 console.error(error);
-                fetchTasks(); // Rollback jika error
+                fetchTasks(); 
             }
         }
 
-        // Form Submit Handler
         document.getElementById('task-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const input = document.getElementById('task-input');
@@ -702,6 +716,92 @@
             updateRoadmapProgress();
         }
 
+        // --- 5. POMODORO TIMER LOGIC ---
+        let timerInterval;
+        let timeLeft = 25 * 60; // 25 Menit dalam detik
+        let isTimerRunning = false;
+        let isFocusMode = true; // true: 25m focus, false: 5m break
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            document.getElementById('timer-display').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function toggleTimer() {
+            const btn = document.getElementById('btn-timer-play');
+            
+            if (isTimerRunning) {
+                // Pause timer
+                clearInterval(timerInterval);
+                isTimerRunning = false;
+                btn.innerHTML = '<i class="fa-solid fa-play mr-1"></i> Start';
+                btn.classList.replace('bg-amber-600/20', 'bg-brand-600/20');
+                btn.classList.replace('text-amber-500', 'text-brand-400');
+            } else {
+                // Start timer
+                isTimerRunning = true;
+                btn.innerHTML = '<i class="fa-solid fa-pause mr-1"></i> Pause';
+                btn.classList.replace('bg-brand-600/20', 'bg-amber-600/20');
+                btn.classList.replace('text-brand-400', 'text-amber-500');
+                
+                timerInterval = setInterval(() => {
+                    if (timeLeft > 0) {
+                        timeLeft--;
+                        updateTimerDisplay();
+                    } else {
+                        // Waktu Habis
+                        clearInterval(timerInterval);
+                        isTimerRunning = false;
+                        
+                        // Notifikasi (bisa ganti dengan suara alert ke depannya)
+                        alert(isFocusMode 
+                            ? "Waktu fokus habis! Kerja bagus, sekarang waktunya istirahat 5 menit." 
+                            : "Waktu istirahat selesai! Mari kembali fokus bekerja.");
+                            
+                        toggleTimerMode(); // Otomatis ganti mode (Fokus <-> Istirahat)
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            timeLeft = isFocusMode ? 25 * 60 : 5 * 60;
+            updateTimerDisplay();
+            
+            const btn = document.getElementById('btn-timer-play');
+            btn.innerHTML = '<i class="fa-solid fa-play mr-1"></i> Start';
+            btn.classList.remove('bg-amber-600/20', 'text-amber-500');
+            btn.classList.add('bg-brand-600/20', 'text-brand-400');
+        }
+
+        function toggleTimerMode() {
+            isFocusMode = !isFocusMode;
+            timeLeft = isFocusMode ? 25 * 60 : 5 * 60;
+            
+            // Ubah tampilan UI label
+            const labelEl = document.getElementById('timer-label');
+            const iconEl = document.getElementById('timer-icon');
+            
+            if(isFocusMode) {
+                labelEl.textContent = 'Focus Timer';
+                labelEl.className = 'text-xs font-semibold text-brand-400 uppercase tracking-wider';
+                iconEl.className = 'fa-solid fa-mug-hot text-xs';
+            } else {
+                labelEl.textContent = 'Break Time';
+                labelEl.className = 'text-xs font-semibold text-green-400 uppercase tracking-wider';
+                iconEl.className = 'fa-solid fa-laptop-code text-xs';
+            }
+            
+            if (isTimerRunning) {
+                toggleTimer(); // Pause jika sedang berjalan saat diganti mode-nya
+            }
+            updateTimerDisplay();
+        }
+
         // --- UTILS ---
         function escapeHTML(str) {
             return str.replace(/[&<>'"]/g, 
@@ -717,6 +817,7 @@
 
         // --- INIT ---
         checkSession(); 
+        updateTimerDisplay(); // Inisialisasi tampilan angka timer
 
     </script>
 </body>
